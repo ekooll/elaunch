@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>eLaunch · Nova senha</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;700;800&display=swap">
+<style>
+/* Tokens copiados de launcher/renderer/index.html :root (tema do eLaunch). */
+:root{--bg:#070b12;--superficie:#0c121c;--azul-rgb:47,125,255;--ouro:#f5b93f;--ouro-rgb:245,185,63;
+  --texto:#eef2fb;--borda:#22304a;--erro:#ff6b6b;--good:#4fc47a;--muted:#9fb0cc}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--texto);font:500 15px 'Exo 2',system-ui,sans-serif;
+  background-image:radial-gradient(1100px 620px at 6% -10%,rgba(var(--azul-rgb),.16),transparent 62%);
+  display:flex;align-items:center;justify-content:center;min-height:100vh;padding:16px}
+.card{width:100%;max-width:400px;background:linear-gradient(160deg,rgba(12,18,28,.96),rgba(7,11,18,.96));
+  border:1px solid var(--borda);border-radius:20px;padding:28px 24px;box-shadow:0 10px 30px rgba(7,11,18,.55)}
+.marca{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.marca img{width:44px;height:44px;border-radius:12px}
+.marca b{font:800 20px 'Exo 2',sans-serif;letter-spacing:.3px}
+h1{font:800 19px 'Exo 2',sans-serif;margin:0 0 6px}
+p{margin:0 0 14px;color:var(--muted);line-height:1.55}
+label{display:block;font-weight:700;font-size:13px;margin:12px 0 6px}
+input{width:100%;padding:11px 12px;border-radius:11px;background:var(--superficie);border:1px solid var(--borda);
+  color:var(--texto);font:600 15px 'Exo 2',sans-serif;outline:0}
+input:focus{border-color:var(--ouro);box-shadow:0 0 0 3px rgba(var(--ouro-rgb),.12)}
+button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:12px;cursor:pointer;
+  background:var(--ouro);color:#1a1205;font:800 15px 'Exo 2',sans-serif}
+button:disabled{opacity:.55;cursor:wait}
+.msg{margin-top:12px;font-size:13.5px;min-height:1em}
+.msg.erro{color:var(--erro)} .msg.ok{color:var(--good)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="marca"><img src="logo.png" alt=""><b>eLaunch</b></div>
+
+  <section id="tela-form" hidden>
+    <h1>Escolha sua nova senha</h1>
+    <p id="form-email">Digite a nova senha da sua conta eLaunch.</p>
+    <form id="form">
+      <label for="s1">Nova senha</label>
+      <input id="s1" type="password" autocomplete="new-password" minlength="6" required>
+      <label for="s2">Repita a nova senha</label>
+      <input id="s2" type="password" autocomplete="new-password" minlength="6" required>
+      <button id="btn" type="submit">Salvar nova senha</button>
+      <div id="msg" class="msg" role="status"></div>
+    </form>
+  </section>
+
+  <section id="tela-ok" hidden>
+    <h1>Senha trocada ✅</h1>
+    <p>Volte ao eLaunch e entre com o seu e-mail e a senha nova. Pode fechar esta página.</p>
+  </section>
+
+  <section id="tela-confirmado" hidden>
+    <h1>E-mail confirmado ✅</h1>
+    <p>Volte ao eLaunch e entre na sua conta. Pode fechar esta página.</p>
+  </section>
+
+  <section id="tela-erro" hidden>
+    <h1>Este link não vale mais</h1>
+    <p id="erro-txt">O link expirou ou já foi usado. No eLaunch, clique de novo em <b>Esqueci minha senha</b> para receber outro.</p>
+  </section>
+
+  <section id="tela-vazia" hidden>
+    <h1>Trocar a senha do eLaunch</h1>
+    <p>Esta página abre pelo link que chega no seu e-mail. No eLaunch, clique em <b>Esqueci minha senha</b>, abra o e-mail e clique no link.</p>
+  </section>
+</main>
+<script>
+(function () {
+  var SUPABASE_URL = 'https://rxvvorjvbnyzkpziamhs.supabase.co';
+  var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4dnZvcmp2Ym55emtwemlhbWhzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk1NjEyNTksImV4cCI6MjA5NTEzNzI1OX0.hoUpXGuqup7frpAp9rdnJFSQ0PtYI-mcGWECgeLudCA';
+  var h = new URLSearchParams(location.hash.slice(1));
+  var q = new URLSearchParams(location.search);
+  // O token vem no #fragmento do link do e-mail; some da barra de endereco e do historico ja'.
+  if (location.hash || location.search) history.replaceState(null, '', location.pathname);
+
+  function mostra (id) {
+    ['tela-form', 'tela-ok', 'tela-confirmado', 'tela-erro', 'tela-vazia'].forEach(function (t) {
+      document.getElementById(t).hidden = (t !== id);
+    });
+  }
+
+  var erroCod = h.get('error_code') || q.get('error_code');
+  var erro = h.get('error') || q.get('error');
+  var tipo = h.get('type');
+  var token = h.get('access_token');
+
+  if (erro || erroCod) {
+    if (erroCod && erroCod !== 'otp_expired') {
+      document.getElementById('erro-txt').textContent =
+        'Não deu para abrir este link (' + erroCod + '). No eLaunch, clique de novo em Esqueci minha senha para receber outro.';
+    }
+    return mostra('tela-erro');
+  }
+  if (!token) return mostra('tela-vazia');
+  if (tipo !== 'recovery') return mostra('tela-confirmado');
+
+  mostra('tela-form');
+  var msg = document.getElementById('msg');
+  var btn = document.getElementById('btn');
+  function aviso (t, cls) { msg.textContent = t; msg.className = 'msg ' + (cls || ''); }
+
+  function traduz (status, j) {
+    var cod = (j && (j.error_code || j.code)) || '';
+    var m = String((j && (j.msg || j.message || j.error_description)) || '');
+    if (cod === 'same_password' || /different from the old/i.test(m)) return 'a senha nova é igual à antiga — escolha outra';
+    if (cod === 'weak_password' || /at least|weak/i.test(m)) return 'senha muito curta — use pelo menos 6 caracteres';
+    if (status === 401 || status === 403 || /expired|invalid/i.test(m)) return 'o link expirou — no eLaunch, peça outro em Esqueci minha senha';
+    if (status === 429) return 'muitas tentativas — espere alguns minutos e tente de novo';
+    return 'não deu para salvar agora (' + status + ') — tente de novo em instantes';
+  }
+
+  document.getElementById('form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var s1 = document.getElementById('s1').value, s2 = document.getElementById('s2').value;
+    if (s1.length < 6) return aviso('a senha precisa de pelo menos 6 caracteres', 'erro');
+    if (s1 !== s2) return aviso('as duas senhas não são iguais', 'erro');
+    btn.disabled = true; aviso('salvando…');
+    fetch(SUPABASE_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ password: s1 })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        if (!r.ok) { btn.disabled = false; return aviso(traduz(r.status, j), 'erro'); }
+        // Encerra so' a sessao aberta por este link; a do app nao e' tocada.
+        fetch(SUPABASE_URL + '/auth/v1/logout?scope=local', {
+          method: 'POST', headers: { apikey: ANON, Authorization: 'Bearer ' + token }
+        }).catch(function () {});
+        token = null;
+        mostra('tela-ok');
+      });
+    }).catch(function () { btn.disabled = false; aviso('sem conexão — confira a internet e tente de novo', 'erro'); });
+  });
+})();
+</script>
+</body>
+</html>
